@@ -17,7 +17,6 @@ use SignNow\Core\Token\BearerToken;
 use SignNow\Core\Token\TokenInterface;
 use SignNow\Exception\SignNowApiException;
 use SplFileInfo;
-use Throwable;
 
 class ApiClient
 {
@@ -31,36 +30,21 @@ class ApiClient
     ) {
     }
 
-    /**
-     * @throws SignNowApiException
-     */
-    public function send(RequestInterface $request): object
+    public function send(RequestInterface $request, bool $jsonDecode = true): mixed
     {
         $endpoint = $this->endpointResolver->resolve($request);
 
         $method = $endpoint->getMethod();
 
-        try {
-            $response = $this->client->{$method}(
-                $this->buildUri($endpoint, $request->uriParams()),
-                $this->configureOptions($request, $endpoint),
-            );
+        $response = $this->client->{$method}(
+            $this->buildUri($endpoint, $request->uriParams()),
+            $this->configureOptions($request, $endpoint),
+        );
 
-            return $this->responseMapper
-                ->validate($response)
-                ->map($response, $endpoint);
-        } catch (Throwable $exception) {
-            throw new SignNowApiException(
-                sprintf(
-                    'Failed processing signNow %s %s request.',
-                    strtoupper($endpoint->getMethod()),
-                    $endpoint->getUrl()
-                ),
-                null,
-                $exception,
-                $request
-            );
+        if ($jsonDecode === true) {
+            return json_decode($response->getBody()->getContents());
         }
+        return $response->getBody()->getContents();
     }
 
     public function setBearerToken(BearerToken $bearerToken): self
@@ -93,7 +77,7 @@ class ApiClient
             );
         }
 
-        return $host . $uri;
+        return $host . $uri . '?type=collapsed';
     }
 
     /**
